@@ -109,9 +109,7 @@ Notes: Need to check the FP16 overflow issue with TensorRT 8.2.1.8.
 | batchsize=64 | 329.13984 qps | 833.4208 qps | 849.5168 qps |
 | batchsize=256 | 331.9808 qps | 844.10752 qps | 840.33024 qps |
 
-Analysis: Compared with FP16, INT8 does not speed up at present.
-The main reason is that, for the Transformer structure, most of the calculations are processed by Myelin. 
-Currently Myelin does not support the PTQ path, so the current test results are expected.   
+Analysis: Compared with FP16, INT8 does not speed up at present. And the current test results are expected.   
 Attached the int8 and fp16 engine layer information with batchsize=128 on T4.  
 
 Build with int8 precision:
