@@ -98,7 +98,7 @@ Evaluate the accuracy of the Pytorch pretrained model.
 | TensorRT Engine(FP32) | 81.156 |  |
 | TensorRT Engine(FP16) | - | TensorRT 8.0.3.4: 81.156% vs TensorRT 8.2.1.8: 72.768% |
 
-Notes: Reported a nvbug for the FP16 accuracy issue, please refer to [nvbug 3464358](https://nvbugswb.nvidia.com/NVBugs5/redir.aspx?url=/3464358).
+Notes: Need to check the FP16 overflow issue with TensorRT 8.2.1.8.
 
 ## Speed Test of TensorRT engine(T4) ##
 
@@ -136,4 +136,4 @@ Layer(Reformat): Reformatting CopyNode for Output Tensor 0 to {ForeignNode[318..
 ```   
 
 ## Todo ##
-After the FP16 [nvbug 3464358](https://nvbugswb.nvidia.com/NVBugs5/redir.aspx?url=/3464358) solved, will do the QAT optimization.
+After the FP16 issue solved, will do the QAT optimization.
