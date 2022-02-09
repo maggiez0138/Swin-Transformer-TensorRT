@@ -27,7 +27,8 @@ def build_model(config):
                                 drop_path_rate=config.MODEL.DROP_PATH_RATE,
                                 ape=config.MODEL.SWIN.APE,
                                 patch_norm=config.MODEL.SWIN.PATCH_NORM,
-                                use_checkpoint=config.TRAIN.USE_CHECKPOINT)
+                                use_checkpoint=config.TRAIN.USE_CHECKPOINT,
+                                quantize=config.QUANTIZE)
     elif model_type == 'swin_mlp':
         model = SwinMLP(img_size=config.DATA.IMG_SIZE,
                         patch_size=config.MODEL.SWIN_MLP.PATCH_SIZE,

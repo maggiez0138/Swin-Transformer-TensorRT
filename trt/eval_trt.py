@@ -10,7 +10,7 @@ import numpy as np
 sys.path.append('./')  # to run '$ python *.py' files in subdirectories
 
 from config import get_config
-from trt.engine import allocate_buffers, do_inference, image_class_accurate, load_tensorrt_engine
+from trt.trt_utils import allocate_buffers, do_inference, image_class_accurate, load_tensorrt_engine
 from data.build import build_dataset
 
 
@@ -88,6 +88,10 @@ def validate(data_loader_val, model_path, config):
                                                                outputs=outputs, stream=stream)
                     assert (len(outputs_trt) == 1)
                     accurate_cnt += image_class_accurate(list(outputs_trt.values())[0], batch_labels)
+
+                    if total_cnt % 1000 == 0:
+                        print("Processed {} images.".format(total_cnt))
+
             duration = time.time() - start
 
     print("Evaluation of TRT QAT model on {} images: {}, fps: {}".format(total_cnt,

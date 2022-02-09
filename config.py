@@ -88,12 +88,24 @@ _C.MODEL.SWIN_MLP.PATCH_NORM = True
 # -----------------------------------------------------------------------------
 _C.TRAIN = CN()
 _C.TRAIN.START_EPOCH = 0
-_C.TRAIN.EPOCHS = 300
-_C.TRAIN.WARMUP_EPOCHS = 20
+
+
+# Comment the init setting for LR
+# _C.TRAIN.EPOCHS = 300
+# _C.TRAIN.WARMUP_EPOCHS = 20
+# _C.TRAIN.WEIGHT_DECAY = 0.05
+# _C.TRAIN.BASE_LR = 5e-4
+# _C.TRAIN.WARMUP_LR = 5e-7
+# _C.TRAIN.MIN_LR = 5e-6
+
+# the quantization setting for LR
+_C.TRAIN.EPOCHS = 3
+_C.TRAIN.WARMUP_EPOCHS = 0
 _C.TRAIN.WEIGHT_DECAY = 0.05
-_C.TRAIN.BASE_LR = 5e-4
+_C.TRAIN.BASE_LR = 1e-5
 _C.TRAIN.WARMUP_LR = 5e-7
-_C.TRAIN.MIN_LR = 5e-6
+_C.TRAIN.MIN_LR = 1e-7
+
 # Clip gradient norm
 _C.TRAIN.CLIP_GRAD = 5.0
 # Auto resume from latest checkpoint
@@ -180,6 +192,26 @@ _C.THROUGHPUT_MODE = False
 # local rank for DistributedDataParallel, given by command line argument
 _C.LOCAL_RANK = 0
 
+# -----------------------------------------------------------------------------
+# Quantization settings
+# -----------------------------------------------------------------------------
+_C.QUANTIZE = False
+_C.CALIB_BATCH_SIZE = 32
+_C.NUM_CALIB_BATCH = 16
+_C.NUM_FINETUNE_EPOCHS = 0
+_C.CALIBRATOR = "max"
+_C.PERCENTILE = [99.9, 99.99, 99.999, 99.9999]
+_C.SENSITIVITY = False
+# used by test, for imagenet
+_C.ACCU_TOLERANCE = 0.925
+_C.SKIP_LAYERS = False
+_C.DYNAMIC = False
+
+# -----------------------------------------------------------------------------
+# ONNX settings
+# -----------------------------------------------------------------------------
+_C.BATCH_SIZE_ONNX = 16
+
 
 def _update_config_from_file(config, cfg_file):
     config.defrost()
@@ -228,6 +260,32 @@ def update_config(config, args):
         config.EVAL_MODE = True
     if args.throughput:
         config.THROUGHPUT_MODE = True
+
+    # merge configs for quantization
+    if hasattr(args, 'quantize') and args.quantize:
+        config.QUANTIZE = args.quantize
+    if hasattr(args, 'calib_batch_size') and args.calib_batch_size:
+        config.CALIB_BATCH_SIZE = args.calib_batch_size
+    if hasattr(args, 'num_calib_batch') and args.num_calib_batch:
+        config.NUM_CALIB_BATCH = args.num_calib_batch
+    if hasattr(args, 'num_finetune_epochs') and args.num_finetune_epochs:
+        config.NUM_FINETUNE_EPOCHS = args.num_finetune_epochs
+    if hasattr(args, 'calibrator') and args.calibrator:
+        config.CALIBRATOR = args.calibrator
+    if hasattr(args, 'percentile') and args.percentile:
+        config.PERCENTILE = args.percentile
+    if hasattr(args, 'sensitivity') and args.sensitivity:
+        config.SENSITIVITY = args.sensitivity
+    if hasattr(args, 'accu_tolerance') and args.accu_tolerance:
+        config.ACCU_TOLERANCE = args.accu_tolerance
+    if hasattr(args, 'skip_layers') and args.skip_layers:
+        config.SKIP_LAYERS = args.skip_layers
+    if hasattr(args, 'dynamic') and args.dynamic:
+        config.DYNAMIC = args.dynamic
+
+    # merge configs for onnx
+    if hasattr(args, 'batch_size_onnx') and args.batch_size_onnx:
+        config.BATCH_SIZE_ONNX = args.batch_size_onnx
 
     # set local rank for distributed training
     config.LOCAL_RANK = args.local_rank

@@ -20,6 +20,14 @@ try:
 except ImportError:
     amp = None
 
+try:
+    from pytorch_quantization import nn as quant_nn
+except ImportError:
+    raise ImportError(
+        "pytorch-quantization is not installed. Install from "
+        "https://github.com/NVIDIA/TensorRT/tree/master/tools/pytorch-quantization."
+    )
+
 
 def parse_option():
     parser = argparse.ArgumentParser('Swin Transformer export script', add_help=False)
@@ -51,6 +59,9 @@ def parse_option():
     parser.add_argument('--eval', action='store_true', help='Perform evaluation only')
     parser.add_argument('--throughput', action='store_true', help='Test throughput only')
 
+    # settings for exporting onnx
+    parser.add_argument('--batch-size-onnx', type=int, help="batchsize when export the onnx model")
+
     # distributed training
     parser.add_argument("--local_rank", type=int, help='local rank for DistributedDataParallel')
 
@@ -59,21 +70,14 @@ def parse_option():
     return args, config
 
 
-def main(config):
-    logger.info(f"Creating model:{config.MODEL.TYPE}/{config.MODEL.NAME}")
-    model = build_model(config)
-    model.cuda()
-    logger.info(str(model))
-
-
-    max_accuracy = load_checkpoint(config, model, None, None, logger)
-    print('load_checkpoint, recovery max_accuracy: ', max_accuracy)
-
+def export_onnx(model, config):
     # ONNX export
     try:
         model.eval()
+        quant_nn.TensorQuantizer.use_fb_fake_quant = True  # We have to shift to pytorch's fake quant ops before exporting the model to ONNX
+
         import onnx
-        dummy_input = torch.randn(config.DATA.BATCH_SIZE, 3, 224, 224, device='cuda')
+        dummy_input = torch.randn(config.BATCH_SIZE_ONNX, 3, 224, 224, device='cuda')
 
         print('\nStarting ONNX export with onnx %s...' % onnx.__version__)
         f = config.MODEL.RESUME.replace('.pth', '.onnx')  # filename
@@ -87,16 +91,25 @@ def main(config):
                           input_names=input_names,
                           output_names=output_names,
                           #dynamic_axes=dynamic_axes,
+                          enable_onnx_checker=False,
+                          do_constant_folding=True,
                           )
-
-        # Checks
-        onnx_model = onnx.load(f)  # load onnx model
-        onnx.checker.check_model(onnx_model)  # check onnx model
-        # print(onnx.helper.printable_graph(onnx_model.graph))  # print a human readable model
         print('ONNX export success, saved as %s' % f)
     except Exception as e:
         print('ONNX export failure: %s' % e)
 
+
+def main(config):
+    logger.info(f"Creating model:{config.MODEL.TYPE}/{config.MODEL.NAME}")
+    model = build_model(config)
+    model.cuda()
+    logger.info(str(model))
+
+
+    max_accuracy = load_checkpoint(config, model, None, None, logger)
+    print('load_checkpoint, recovery max_accuracy: ', max_accuracy)
+
+    export_onnx(model, config)
 
 
 if __name__ == '__main__':

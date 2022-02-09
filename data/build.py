@@ -57,6 +57,16 @@ def build_loader(config):
         drop_last=False
     )
 
+    # Dataset for calibration
+    if config.QUANTIZE:
+        data_loader_calib = torch.utils.data.DataLoader(
+            dataset_train, sampler=sampler_train,
+            batch_size=config.CALIB_BATCH_SIZE,
+            num_workers=config.DATA.NUM_WORKERS,
+            pin_memory=config.DATA.PIN_MEMORY,
+            drop_last=True,
+        )
+
     # setup mixup / cutmix
     mixup_fn = None
     mixup_active = config.AUG.MIXUP > 0 or config.AUG.CUTMIX > 0. or config.AUG.CUTMIX_MINMAX is not None
@@ -66,7 +76,10 @@ def build_loader(config):
             prob=config.AUG.MIXUP_PROB, switch_prob=config.AUG.MIXUP_SWITCH_PROB, mode=config.AUG.MIXUP_MODE,
             label_smoothing=config.MODEL.LABEL_SMOOTHING, num_classes=config.MODEL.NUM_CLASSES)
 
-    return dataset_train, dataset_val, data_loader_train, data_loader_val, mixup_fn
+    if config.QUANTIZE:
+        return dataset_train, dataset_val, data_loader_train, data_loader_val, data_loader_calib, mixup_fn
+    else:
+        return dataset_train, dataset_val, data_loader_train, data_loader_val, mixup_fn
 
 
 def build_dataset(is_train, config):
