@@ -131,9 +131,32 @@ Evaluate the accuracy of the Pytorch pretrained model.
 | batchsize=64 | 329.13984 qps | 833.4208 qps | 780.006 qps |
 | batchsize=256 | 331.9808 qps | 844.10752 qps | - |
 
-Analysis: Compared with FP16, INT8 does not speed up at present.
-For the new swin transformer structure, some extra efforts are needed to improve the throughput.
-Will submit an issue to discuss the int8 throughput problem.
+Result:   
+1. Now the accuracy and speedup of FP16 is as expected, it is highly recommended to deploy Swin-Transformer with FP16 precision.
+ 
+2. Compared with FP16, INT8 does not speed up at present. Attached the nsys analysis file.  
+   
+![nsys result](./images/nsys%20abnormal.png)  
+  
+a. For the torch.matmul operation (Q*K and (Q*K)*V) of MHA, although we insert FakeQuantize node 
+before torch.matmul, `volta_sgemm_int8_64x64_nn` is choosed.  
+
+b. Although the nn.Linear operation of Q, K and V runs with int8 precision(`trt_volta_fp32_igemm_int8_128x128_ldg4_relu_nn_v0`), 
+but tensor core kernel is not enables.
+
+The comparasion of FP16 and QAT-int8 is as below.  
+![nsys result](./images/FP16.png)   
+  
+![nsys result](./images/QAT.png) 
+
+Analysis:   
+a. That SGEMM kernel is used for the two batch-GEMM: Q*K^T and (Q*K^T)*V. The gemm size is very bad for IMMA: 
+(1024x3x49x32 * 1024x3x32x49 -> 1024x3x49x49) and (1024x3x49x49 * 1024x3x49x32 -> 1024x3x49x32). 
+"49" is just not a good number for IMMA, while 49 equals window_size(7)*window_size(7), is widely used in Swin-Transformer. 
+Please refer to [ViT and Swin-Transformer](./images/Swin_Transformer_and_ViT.pdf) for detail. 
+
+b. QAT+FP16 is gray area. Under QAT, sometimes TRT doesn't attempt to select an fp16 gemm kernel. Therefore, our int8 engine 
+may not perform as well as fp16.
 
 Attached the fp16 engine layer information with batchsize=128 on T4.  
 ```css
@@ -177,5 +200,4 @@ In order to do the QAT finetuning, some utils are needed to install.
    ```  
 
 ## Todo ##
-1. Will submit an issue to discuss the int8 throughput problem. Since swin transformer is a relatively new structure, extra efforts are needed to improve the performance.
-2. After the int8 throughput issue solved, will finetune the QAT model to check the post-QAT accuracy.
+1. Will follow the TensorRT int8 performance of Swin Transormer.
