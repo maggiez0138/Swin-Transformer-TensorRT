@@ -419,7 +419,7 @@ def main(config):
     print("Accuracy summary:")
     table = PrettyTable(['Stage','Top1'])
     table.align['Stage'] = "l"
-    table.add_row( [ 'Initial',     "{:.3f}, {:.3f}".format(acc1, acc5) ] )
+    # table.add_row( [ 'Initial',     "{:.3f}, {:.3f}".format(acc1, acc5) ] )
     table.add_row( [ 'Calibrated',  "{:.3f}, {:.3f}".format(acc1_calibrated, acc5_calibrated) ] )
     if config.NUM_FINETUNE_EPOCHS > 0:
         table.add_row( [ 'Finetuned',   "{:.3f}, {:.3f}".format(acc1_finetuned, acc5_finetuned) ] )
