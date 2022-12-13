@@ -9,10 +9,14 @@ import os
 import argparse
 import torch
 
-from config import get_config
+from SwinTransformer.config import get_config
+from SwinTransformer.logger import create_logger
+from SwinTransformer.utils import load_checkpoint
+
+# Use the model definition modified
+# 1) QAT support
+# 2) Dynamic shape export support
 from models import build_model
-from logger import create_logger
-from utils import load_checkpoint
 
 try:
     # noinspection PyUnresolvedReferences
@@ -59,8 +63,8 @@ def parse_option():
     parser.add_argument('--eval', action='store_true', help='Perform evaluation only')
     parser.add_argument('--throughput', action='store_true', help='Test throughput only')
 
-    # settings for exporting onnx
-    parser.add_argument('--batch-size-onnx', type=int, help="batchsize when export the onnx model")
+    # # settings for exporting onnx
+    # parser.add_argument('--batch-size-onnx', type=int, help="batchsize when export the onnx model")
 
     # distributed training
     parser.add_argument("--local_rank", type=int, help='local rank for DistributedDataParallel')
@@ -77,7 +81,7 @@ def export_onnx(model, config):
         quant_nn.TensorQuantizer.use_fb_fake_quant = True  # We have to shift to pytorch's fake quant ops before exporting the model to ONNX
 
         import onnx
-        dummy_input = torch.randn(config.BATCH_SIZE_ONNX, 3, 224, 224, device='cuda')
+        dummy_input = torch.randn(1, 3, config.DATA.IMG_SIZE, config.DATA.IMG_SIZE, device='cuda')
 
         print('\nStarting ONNX export with onnx %s...' % onnx.__version__)
         f = config.MODEL.RESUME.replace('.pth', '.onnx')  # filename
@@ -86,12 +90,11 @@ def export_onnx(model, config):
 
         # Now with dynamic_axes, the output of TensorRT engine is wrong
         # So now we use fixed size
-        # dynamic_axes = {'input_0': {0: 'batch_size'}}
-        torch.onnx.export(model, dummy_input, f, verbose=False, opset_version=12,
+        dynamic_axes = {'input_0': {0: 'batch_size'}, 'output_0': {0: 'batch_size'}}
+        torch.onnx.export(model, dummy_input, f, verbose=False, opset_version=13,
                           input_names=input_names,
                           output_names=output_names,
-                          #dynamic_axes=dynamic_axes,
-                          enable_onnx_checker=False,
+                          dynamic_axes=dynamic_axes,
                           do_constant_folding=True,
                           )
         print('ONNX export success, saved as %s' % f)
@@ -105,9 +108,11 @@ def main(config):
     model.cuda()
     logger.info(str(model))
 
-
-    max_accuracy = load_checkpoint(config, model, None, None, logger)
-    print('load_checkpoint, recovery max_accuracy: ', max_accuracy)
+    checkpoint = torch.load(config.MODEL.RESUME, map_location='cpu')
+    msg = model.load_state_dict(checkpoint['model'] if 'model' in checkpoint.keys() else checkpoint,
+                                            strict=False)
+    logger.info(msg)
+    del checkpoint
 
     export_onnx(model, config)
 

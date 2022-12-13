@@ -9,9 +9,10 @@ import numpy as np
 import onnxruntime
 sys.path.append('./')  # to run '$ python *.py' files in subdirectories
 
-from config import get_config
-from data.build import build_dataset
-from trt.engine import image_class_accurate
+
+from trt.trt_utils import image_class_accurate
+from SwinTransformer.config import get_config
+from SwinTransformer.data.build import build_dataset
 
 
 def get_input_shape(binding_dims):
@@ -39,7 +40,7 @@ class Processor():
             self.output_names.append(output_name)
 
         self.input_shape = get_input_shape(self.ort_session.get_inputs()[0].shape)
-        print('---self.input_shape: ', self.input_shape)
+        print('---self.input_shape: ', self.input_shape, self.ort_session.get_inputs()[0].shape)
 
 
     def inference(self, img):
@@ -120,6 +121,9 @@ def validate(data_loader_val, model_path, config):
 
             outputs_onnxrt = processor.inference(batch_images)
             accurate_cnt += image_class_accurate(outputs_onnxrt, batch_labels)
+
+        if total_cnt == config.DATA.BATCH_SIZE*20:
+            break
     duration = time.time() - start
 
     print("Evaluation of TRT QAT model on {} images: {}, fps: {}".format(total_cnt,

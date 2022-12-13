@@ -6,13 +6,14 @@ import numpy as np
 import tensorrt as trt
 import pycuda.autoinit
 import pycuda.driver as cuda
+import os
 
 from tensorrt import ICudaEngine
 from tensorrt.tensorrt import Builder, IBuilderConfig, IElementWiseLayer, ILayer, INetworkDefinition, \
     IOptimizationProfile, IReduceLayer, Logger, OnnxParser, Runtime
 
 logger = logging.getLogger(__name__)
-
+trt_version = [int(n) for n in trt.__version__.split('.')]
 
 # Array of TensorRT loggers. We need to keep global references to
 # the TensorRT loggers that we create to prevent them from being
@@ -154,7 +155,8 @@ def build_engine(
     optimal_shape: Tuple[int, int],
     max_shape: Tuple[int, int],
     workspace_size: int,
-    mode:str
+    mode:str,
+    timing_cache_file:str,
 ) -> ICudaEngine:
     """
     Convert ONNX file to TensorRT engine.
@@ -209,9 +211,33 @@ def build_engine(
                 config.add_optimization_profile(profile)
                 if mode == "fp16":
                     network_definition = fix_fp16_network(network_definition)
+
+                # Speed up the engine build for trt major version >= 8
+                # 1. load global timing cache
+                if trt_version[0] >= 8:
+                    if timing_cache_file != None:
+                        if os.path.exists(timing_cache_file):
+                            with open(timing_cache_file, "rb") as f:
+                                cache = config.create_timing_cache(f.read())
+                                config.set_timing_cache(cache, ignore_mismatch=False)
+                        else:
+                            cache = config.create_timing_cache(b"")
+                            config.set_timing_cache(cache, ignore_mismatch=False)
+
+                # Create the network
                 trt_engine = builder.build_serialized_network(network_definition, config)
                 engine: ICudaEngine = runtime.deserialize_cuda_engine(trt_engine)
                 assert engine is not None, "error during engine generation, check error messages above :-("
+
+                # save global timing cache
+                if trt_version[0] >= 8 and timing_cache_file != None:
+                    cache = config.get_timing_cache()
+                    with cache.serialize() as buffer:
+                        with open(timing_cache_file, "wb") as f:
+                            f.write(buffer)
+                            f.flush()
+                            os.fsync(f)
+
                 return engine
 
 
